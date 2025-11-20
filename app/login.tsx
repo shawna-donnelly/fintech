@@ -1,8 +1,11 @@
 import Colors from '@/constants/Colors';
 import { defaultStyles } from '@/constants/Styles';
+import { isClerkAPIResponseError, useSignIn } from '@clerk/clerk-expo';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -17,6 +20,9 @@ const Page = () => {
   const [phoneNumber, setPhoneNumber] = React.useState('');
   const keyboardVerticalOffset = Platform.OS === 'ios' ? 90 : 0;
 
+  const router = useRouter();
+  const { signIn } = useSignIn();
+
   enum SignInType {
     Phone = 'Phone',
     Email = 'Email',
@@ -26,7 +32,38 @@ const Page = () => {
 
   const onSignIn = async ({ type }: { type: SignInType }) => {
     if (type === SignInType.Phone) {
-      // Handle phone sign-in
+      const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+      try {
+        await signIn?.create({
+          identifier: fullPhoneNumber,
+        });
+        const firstPhoneFactor = signIn?.supportedFirstFactors?.find(
+          (factor: any) => factor.strategy === 'phone_code'
+        );
+
+        if (firstPhoneFactor && 'phoneNumberId' in firstPhoneFactor) {
+          await signIn?.prepareFirstFactor({
+            strategy: 'phone_code',
+            phoneNumberId: firstPhoneFactor.phoneNumberId,
+          });
+        }
+
+        router.push({
+          pathname: '/verify/[phone]',
+          params: { phone: fullPhoneNumber, signin: 'true' },
+        });
+      } catch (error) {
+        console.error(error);
+        console.log('error', JSON.stringify(error, null, 2));
+        if (isClerkAPIResponseError(error)) {
+          if (error.errors[0].code === 'form_identifier_not_found') {
+            Alert.alert(
+              'Phone number not found',
+              'Please enter a valid phone number'
+            );
+          }
+        }
+      }
     } else if (type === SignInType.Email) {
       // Handle email sign-in
     } else if (type === SignInType.Google) {
@@ -41,7 +78,7 @@ const Page = () => {
     icon,
   }: {
     type: SignInType;
-    icon: keyof typeof Ionicons;
+    icon: React.ComponentProps<typeof Ionicons>['name'];
   }) => {
     return (
       <TouchableOpacity

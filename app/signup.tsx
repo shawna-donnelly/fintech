@@ -1,8 +1,10 @@
 import Colors from '@/constants/Colors';
 import { defaultStyles } from '@/constants/Styles';
-import { Link } from 'expo-router';
+import { isClerkAPIResponseError, useSignUp } from '@clerk/clerk-expo';
+import { Link, useRouter } from 'expo-router';
 import React from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -15,9 +17,63 @@ import {
 const Page = () => {
   const [countryCode, setCountryCode] = React.useState('+1');
   const [phoneNumber, setPhoneNumber] = React.useState('');
+
   const keyboardVerticalOffset = Platform.OS === 'ios' ? 90 : 0;
 
-  const onSignUp = async () => {};
+  const router = useRouter();
+  const { signUp } = useSignUp();
+
+  const onSignUp = async () => {
+    const fullPhoneNumber = `${countryCode}${phoneNumber}`;
+
+    if (!phoneNumber) {
+      Alert.alert('Error', 'Please enter a phone number');
+      return;
+    }
+
+    try {
+      await signUp?.create({
+        phoneNumber: fullPhoneNumber,
+      });
+      await signUp?.preparePhoneNumberVerification({ strategy: 'phone_code' });
+
+      router.push({
+        pathname: '/verify/[phone]',
+        params: { phone: fullPhoneNumber },
+      });
+    } catch (error) {
+      console.error('Error signing up:', error);
+
+      if (isClerkAPIResponseError(error)) {
+        const errorCode = error.errors[0]?.code;
+        const errorMessage = error.errors[0]?.message;
+
+        // Handle specific error cases
+        if (errorCode === 'form_identifier_exists') {
+          Alert.alert(
+            'Phone number already exists',
+            'This phone number is already registered. Please sign in instead.'
+          );
+        } else if (
+          errorMessage?.includes('requiredFields') ||
+          errorCode === 'form_param_format_invalid'
+        ) {
+          Alert.alert(
+            'Configuration Error',
+            'Phone-only signup is not enabled in your Clerk dashboard. Please enable phone number authentication and make email optional in your Clerk dashboard settings.'
+          );
+        } else {
+          Alert.alert(
+            'Sign up failed',
+            errorMessage ||
+              'An error occurred during sign up. Please try again.'
+          );
+        }
+      } else {
+        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      }
+    }
+  };
 
   return (
     <KeyboardAvoidingView
