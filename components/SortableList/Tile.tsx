@@ -43,7 +43,7 @@ const Tile = ({ id }: TileProps) => {
             paddingTop: 10,
           }}
         >
-          1024€
+          $1024
         </Text>
       </View>
     );
@@ -116,7 +116,7 @@ const Tile = ({ id }: TileProps) => {
                   paddingVertical: 10,
                 }}
               >
-                {transactions[transactions.length - 1].amount}€
+                ${transactions[transactions.length - 1].amount}
               </Text>
               <Text
                 style={{ color: Colors.gray, fontWeight: 'bold', fontSize: 16 }}
